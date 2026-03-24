@@ -25,7 +25,3 @@ Exit PostgreSQL Shell
 exit
 
 PostgreSQL was successfully installed on Ubuntu. The service was verified using systemctl, and the database was accessed using the psql interface.
-
-
-![Uploading VirtualBox_ubuntu_26_02_2026_17_37_39.png…]()
-
