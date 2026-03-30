@@ -1,0 +1,29 @@
+TASK 0.1
+Linux & PostgreSQL Environment Standardization
+Objective: Prepare interns for real production environments
+
+Step 1 Installing Virtual Box
+Step 2 Setting up Ubuntu on (Virtual Box)
+Step 3 Using Postgresql version 18
+Added Official PostgreSQL Repo (Required for v18)
+Commands
+sudo apt update
+sudo apt install wget gnupg2 -y
+Add key:
+wget -qO - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add –
+Add repo:
+echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+Install PostgreSQL 18
+sudo apt install postgresql-18 postgresql-client-18 -y
+Check:
+psql –version
+Start Service
+sudo systemctl enable postgresql
+sudo systemctl start postgresql
+sudo systemctl status postgresql
+
+INSTALL GIT
+Command
+sudo apt update
+sudo apt install git -y
+
