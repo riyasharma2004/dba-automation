@@ -25,3 +25,14 @@ Exit PostgreSQL Shell
 exit
 
 PostgreSQL was successfully installed on Ubuntu. The service was verified using systemctl, and the database was accessed using the psql interface.
+Most Used Commands 
+•	sudo → run as administrator
+•	apt → Ubuntu package manager
+•	update → refresh available packages
+•	install → install software
+•	git → package name
+•	-y → auto-confirm yes
+•	--version → tells the current version
+•	grep → filter result
+•	.systemctl → service manager
+
