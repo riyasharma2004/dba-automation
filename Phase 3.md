@@ -24,6 +24,7 @@ Steps --
 
 🔵 STEP 2 — INSTALL REQUIRED PACKAGES
 sudo apt update
+sudo apt upgrade
 sudo apt install python3-pip -y
 pip3 install flask psycopg2-binary
 
