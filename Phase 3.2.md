@@ -3,7 +3,7 @@ Step 1 — Enable pg_stat_statements first
 Find your config file:
 sudo find / -name "postgresql.conf" 2>/dev/null
 Open it:
-bashsudo nano /etc/postgresql/15/main/postgresql.conf
+sudo nano /etc/postgresql/15/main/postgresql.conf
 Find and change these two lines (use Ctrl+W to search):
 shared_preload_libraries = 'pg_stat_statements'
 log_min_duration_statement = 1000
