@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Slow Query Analyzer</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Arial, sans-serif; background: #0f172a; color: #e2e8f0; padding: 20px; font-size: 13px; }
+
+.topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding: 14px 20px; background: #1e293b; border-radius: 12px; border: 1px solid #334155; }
+.topbar-title { font-size: 16px; font-weight: bold; color: #f1f5f9; }
+.topbar-sub { font-size: 12px; color: #64748b; margin-top: 2px; }
+.nav-btn { background: #334155; color: #94a3b8; border: 1px solid #475569; border-radius: 8px; padding: 6px 14px; font-size: 12px; cursor: pointer; text-decoration: none; }
+.nav-btn:hover { background: #475569; color: #f1f5f9; }
+
+.metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+.mcard { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 16px; }
+.mcard-label { font-size: 11px; color: #64748b; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .05em; }
+.mcard-val { font-size: 26px; font-weight: bold; }
+.mcard-sub { font-size: 11px; color: #64748b; margin-top: 4px; }
+
+.card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+.card-title { font-size: 13px; font-weight: bold; color: #f1f5f9; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
+.card-title span { font-size: 11px; color: #64748b; font-weight: normal; }
+
+table { width: 100%; border-collapse: collapse; }
+th { font-size: 11px; color: #64748b; text-align: left; padding: 6px 8px; border-bottom: 1px solid #334155; text-transform: uppercase; letter-spacing: .04em; }
+td { font-size: 12px; color: #cbd5e1; padding: 8px; border-bottom: 1px solid #1e3050; vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #243044; }
+
+.pill { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: bold; }
+.pill-red   { background: #2d0000; color: #f87171; border: 1px solid #7f1d1d; }
+.pill-amber { background: #2d1a00; color: #fbbf24; border: 1px solid #854d0e; }
+.pill-green { background: #052e16; color: #4ade80; border: 1px solid #166534; }
+.pill-blue  { background: #0c1e3d; color: #60a5fa; border: 1px solid #1d4ed8; }
+
+.mono { font-family: monospace; font-size: 11px; color: #94a3b8; max-width: 400px; word-break: break-all; }
+
+.divider { text-align: center; font-size: 11px; color: #475569; text-transform: uppercase;
+           letter-spacing: .08em; margin: 20px 0 12px; display: flex; align-items: center; gap: 10px; }
+.divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: #334155; }
+
+.explain-box { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 14px; font-family: monospace; font-size: 12px; color: #4ade80; white-space: pre-wrap; line-height: 1.6; margin-top: 12px; max-height: 400px; overflow-y: auto; }
+.explain-error { background: #2d0000; border: 1px solid #7f1d1d; border-radius: 8px; padding: 14px; font-family: monospace; font-size: 12px; color: #f87171; margin-top: 12px; }
+
+input[type="text"] { width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 10px 14px; color: #e2e8f0; font-size: 13px; font-family: monospace; margin-bottom: 10px; }
+input[type="text"]:focus { outline: none; border-color: #60a5fa; }
+.run-btn { background: #1d4ed8; color: #fff; border: none; border-radius: 8px; padding: 8px 20px; font-size: 13px; cursor: pointer; }
+.run-btn:hover { background: #2563eb; }
+
+.tip { background: #1e3a5f; border-left: 3px solid #60a5fa; border-radius: 0 8px 8px 0; padding: 10px 14px; font-size: 12px; color: #93c5fd; margin-bottom: 16px; line-height: 1.6; }
+
+.footer { text-align: center; font-size: 11px; color: #334155; padding-top: 12px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <div class="topbar-title">Slow Query Analyzer</div>
+    <div class="topbar-sub">pg_stat_statements &nbsp;·&nbsp; Task 3.2 &nbsp;·&nbsp; appdb</div>
+  </div>
+  <a href="/" class="nav-btn">Back to Dashboard</a>
+</div>
+
+<!-- Summary cards -->
+<div class="metrics">
+  <div class="mcard">
+    <div class="mcard-label">Slowest avg query</div>
+    <div class="mcard-val" style="color:#f87171;">
+      {% if slow %}{{ slow[0][3] }} ms{% else %}0 ms{% endif %}
+    </div>
+    <div class="mcard-sub">mean execution time</div>
+  </div>
+  <div class="mcard">
+    <div class="mcard-label">Most called query</div>
+    <div class="mcard-val" style="color:#60a5fa;">
+      {% if most_called %}{{ most_called[0][1] }}x{% else %}0x{% endif %}
+    </div>
+    <div class="mcard-sub">total executions</div>
+  </div>
+  <div class="mcard">
+    <div class="mcard-label">Queries tracked</div>
+    <div class="mcard-val" style="color:#4ade80;">{{ slow|length }}</div>
+    <div class="mcard-sub">by pg_stat_statements</div>
+  </div>
+</div>
+
+<!-- Top slow queries -->
+<div class="divider">Top slow queries by average time</div>
+<div class="card">
+  <div class="card-title">
+    Slowest queries
+    <span>Source: pg_stat_statements ORDER BY mean_exec_time DESC</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Query</th>
+        <th>Calls</th>
+        <th>Avg time</th>
+        <th>Total time</th>
+        <th>Rows</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in slow %}
+      <tr>
+        <td style="color:#64748b;">{{ loop.index }}</td>
+        <td class="mono">{{ s[0] }}...</td>
+        <td>{{ s[1] }}</td>
+        <td>
+          {% if s[3] > 1000 %}
+            <span class="pill pill-red">{{ s[3] }} ms</span>
+          {% elif s[3] > 100 %}
+            <span class="pill pill-amber">{{ s[3] }} ms</span>
+          {% else %}
+            <span class="pill pill-green">{{ s[3] }} ms</span>
+          {% endif %}
+        </td>
+        <td style="color:#94a3b8;">{{ s[2] }} ms</td>
+        <td style="color:#94a3b8;">{{ s[5] }}</td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="6" style="color:#4ade80; text-align:center; padding:20px;">
+          No data yet — run some queries first or pg_stat_statements not enabled
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Most executed queries -->
+<div class="divider">Most executed queries</div>
+<div class="card">
+  <div class="card-title">
+    Highest call count
+    <span>Source: pg_stat_statements ORDER BY calls DESC</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Query</th>
+        <th>Calls</th>
+        <th>Avg time</th>
+        <th>Total time</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for m in most_called %}
+      <tr>
+        <td style="color:#64748b;">{{ loop.index }}</td>
+        <td class="mono">{{ m[0] }}...</td>
+        <td><span class="pill pill-blue">{{ m[1] }}x</span></td>
+        <td style="color:#94a3b8;">{{ m[3] }} ms</td>
+        <td style="color:#94a3b8;">{{ m[2] }} ms</td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="5" style="color:#4ade80; text-align:center; padding:20px;">
+          No data yet
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- EXPLAIN ANALYZE section -->
+<div class="divider">Explain and analyze query plans</div>
+<div class="card">
+  <div class="card-title">
+    EXPLAIN ANALYZE
+    <span>Paste any slow query below to see its execution plan</span>
+  </div>
+
+  <div class="tip">
+    Paste a SELECT query below and click Run. PostgreSQL will show exactly how it executes the query — which indexes it uses, how many rows it scans, and where the time is spent.
+  </div>
+
+  <form method="POST" action="/explain">
+    <input type="text" name="query"
+           placeholder="SELECT * FROM orders WHERE status = 'pending' LIMIT 10"
+           value="{{ explain_query if explain_query else '' }}"/>
+    <button type="submit" class="run-btn">Run EXPLAIN ANALYZE</button>
+  </form>
+
+  {% if explain_result %}
+  <div class="explain-box">{{ explain_result }}</div>
+  {% endif %}
+
+  {% if explain_error %}
+  <div class="explain-error">Error: {{ explain_error }}</div>
+  {% endif %}
+
+</div>
+
+<div class="footer">
+  Phase 3 — Task 3.2 &nbsp;·&nbsp; pg_stat_statements &nbsp;·&nbsp; log_min_duration_statement
+</div>
+
+</body>
+</html>

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Index Optimizer</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Arial, sans-serif; background: #0f172a; color: #e2e8f0; padding: 20px; font-size: 13px; }
+.topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding: 14px 20px; background: #1e293b; border-radius: 12px; border: 1px solid #334155; }
+.topbar-title { font-size: 16px; font-weight: bold; color: #f1f5f9; }
+.topbar-sub { font-size: 12px; color: #64748b; margin-top: 2px; }
+.nav-btn { background: #334155; color: #94a3b8; border: 1px solid #475569; border-radius: 8px; padding: 6px 14px; font-size: 12px; cursor: pointer; text-decoration: none; }
+.nav-btn:hover { background: #475569; color: #f1f5f9; }
+.metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+.mcard { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 16px; }
+.mcard-label { font-size: 11px; color: #64748b; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .05em; }
+.mcard-val { font-size: 26px; font-weight: bold; }
+.mcard-sub { font-size: 11px; color: #64748b; margin-top: 4px; }
+.card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+.card-title { font-size: 13px; font-weight: bold; color: #f1f5f9; margin-bottom: 14px; display: flex; justify-content: space-between; }
+.card-title span { font-size: 11px; color: #64748b; font-weight: normal; }
+table { width: 100%; border-collapse: collapse; }
+th { font-size: 11px; color: #64748b; text-align: left; padding: 6px 8px; border-bottom: 1px solid #334155; text-transform: uppercase; }
+td { font-size: 12px; color: #cbd5e1; padding: 8px; border-bottom: 1px solid #1e3050; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #243044; }
+.pill { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: bold; }
+.pill-red { background: #2d0000; color: #f87171; border: 1px solid #7f1d1d; }
+.pill-amber { background: #2d1a00; color: #fbbf24; border: 1px solid #854d0e; }
+.pill-green { background: #052e16; color: #4ade80; border: 1px solid #166534; }
+.mono { font-family: monospace; font-size: 11px; color: #94a3b8; }
+.divider { display: flex; align-items: center; gap: 10px; margin: 20px 0 12px; font-size: 11px; color: #475569; text-transform: uppercase; letter-spacing: .08em; }
+.divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: #334155; }
+.tip { background: #1e3a5f; border-left: 3px solid #60a5fa; padding: 10px 14px; font-size: 12px; color: #93c5fd; margin-bottom: 16px; line-height: 1.6; border-radius: 0 8px 8px 0; }
+.footer { text-align: center; font-size: 11px; color: #334155; padding-top: 12px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <div class="topbar-title">Index Optimizer</div>
+    <div class="topbar-sub">pg_stat_user_indexes &nbsp;·&nbsp; pg_indexes &nbsp;·&nbsp; Task 4.1</div>
+  </div>
+  <a href="/" class="nav-btn">Back to Dashboard</a>
+</div>
+
+<div class="metrics">
+  <div class="mcard">
+    <div class="mcard-label">Unused indexes</div>
+    <div class="mcard-val" style="color:#f87171;">{{ unused|length }}</div>
+    <div class="mcard-sub">Never used — wasting space</div>
+  </div>
+  <div class="mcard">
+    <div class="mcard-label">Total indexes</div>
+    <div class="mcard-val" style="color:#60a5fa;">{{ all_indexes|length }}</div>
+    <div class="mcard-sub">Tracked by PostgreSQL</div>
+  </div>
+  <div class="mcard">
+    <div class="mcard-label">Tables needing index</div>
+    <div class="mcard-val" style="color:#fbbf24;">{{ missing|length }}</div>
+    <div class="mcard-sub">High sequential scans</div>
+  </div>
+</div>
+
+<div class="divider">Unused indexes — safe to drop</div>
+<div class="card">
+  <div class="card-title">
+    Indexes never used since last reset
+    <span>idx_scan = 0 &nbsp;|&nbsp; pg_stat_user_indexes</span>
+  </div>
+  <div class="tip">These indexes exist but PostgreSQL never uses them. They slow down INSERT and UPDATE operations and waste disk space. Consider dropping them.</div>
+  <table>
+    <thead>
+      <tr><th>#</th><th>Table</th><th>Index name</th><th>Size</th><th>Times used</th></tr>
+    </thead>
+    <tbody>
+      {% for u in unused %}
+      <tr>
+        <td style="color:#64748b;">{{ loop.index }}</td>
+        <td>{{ u[1] }}</td>
+        <td class="mono">{{ u[2] }}</td>
+        <td style="color:#f87171;">{{ u[3] }}</td>
+        <td><span class="pill pill-red">0 times</span></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" style="color:#4ade80; text-align:center; padding:20px;">No unused indexes — all indexes are being used</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="divider">Tables possibly missing indexes</div>
+<div class="card">
+  <div class="card-title">
+    High sequential scan tables
+    <span>seq_scan much higher than idx_scan</span>
+  </div>
+  <div class="tip">These tables are being scanned fully instead of using an index. Adding an index on the WHERE clause column will speed up queries significantly.</div>
+  <table>
+    <thead>
+      <tr><th>Table</th><th>Seq scans</th><th>Index scans</th><th>Size</th><th>Live rows</th><th>Suggestion</th></tr>
+    </thead>
+    <tbody>
+      {% for m in missing %}
+      <tr>
+        <td>{{ m[0] }}</td>
+        <td><span class="pill pill-red">{{ m[1] }}</span></td>
+        <td style="color:#94a3b8;">{{ m[2] or 0 }}</td>
+        <td style="color:#94a3b8;">{{ m[3] }}</td>
+        <td style="color:#94a3b8;">{{ m[4] }}</td>
+        <td><span class="pill pill-amber">Add index</span></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" style="color:#4ade80; text-align:center; padding:20px;">No missing indexes detected</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="divider">All indexes with usage stats</div>
+<div class="card">
+  <div class="card-title">
+    Index usage ranking
+    <span>pg_stat_user_indexes ORDER BY idx_scan DESC</span>
+  </div>
+  <table>
+    <thead>
+      <tr><th>#</th><th>Table</th><th>Index</th><th>Size</th><th>Times used</th><th>Tuples read</th></tr>
+    </thead>
+    <tbody>
+      {% for i in all_indexes %}
+      <tr>
+        <td style="color:#64748b;">{{ loop.index }}</td>
+        <td>{{ i[0] }}</td>
+        <td class="mono">{{ i[1] }}</td>
+        <td style="color:#94a3b8;">{{ i[2] }}</td>
+        <td>
+          {% if i[3] > 100 %}
+            <span class="pill pill-green">{{ i[3] }}</span>
+          {% elif i[3] > 0 %}
+            <span class="pill pill-amber">{{ i[3] }}</span>
+          {% else %}
+            <span class="pill pill-red">{{ i[3] }}</span>
+          {% endif %}
+        </td>
+        <td style="color:#94a3b8;">{{ i[4] }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" style="color:#4ade80; text-align:center; padding:20px;">No indexes found</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="footer">Phase 4 — Task 4.1 &nbsp;·&nbsp; pg_stat_user_indexes · pg_indexes</div>
+</body>
+</html>

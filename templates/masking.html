@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Data Masking & Access Control</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Arial, sans-serif; background: #0f172a; color: #e2e8f0; padding: 20px; font-size: 13px; }
+.topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding: 14px 20px; background: #1e293b; border-radius: 12px; border: 1px solid #334155; }
+.topbar-title { font-size: 16px; font-weight: bold; color: #f1f5f9; }
+.topbar-sub { font-size: 12px; color: #64748b; margin-top: 2px; }
+.nav-btn { background: #334155; color: #94a3b8; border: 1px solid #475569; border-radius: 8px; padding: 6px 14px; font-size: 12px; text-decoration: none; }
+.nav-btn:hover { background: #475569; color: #f1f5f9; }
+
+.metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+.mcard { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 16px; }
+.mcard-label { font-size: 11px; color: #64748b; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .05em; }
+.mcard-val { font-size: 26px; font-weight: bold; }
+.mcard-sub { font-size: 11px; color: #64748b; margin-top: 4px; }
+
+.card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+.card-title { font-size: 13px; font-weight: bold; color: #f1f5f9; margin-bottom: 14px; display: flex; justify-content: space-between; }
+.card-title span { font-size: 11px; color: #64748b; font-weight: normal; }
+
+table { width: 100%; border-collapse: collapse; }
+th { font-size: 11px; color: #64748b; text-align: left; padding: 6px 8px; border-bottom: 1px solid #334155; text-transform: uppercase; }
+td { font-size: 12px; color: #cbd5e1; padding: 8px; border-bottom: 1px solid #1e3050; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #243044; }
+
+.pill { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: bold; }
+.pill-red   { background: #2d0000; color: #f87171; border: 1px solid #7f1d1d; }
+.pill-amber { background: #2d1a00; color: #fbbf24; border: 1px solid #854d0e; }
+.pill-green { background: #052e16; color: #4ade80; border: 1px solid #166534; }
+.pill-blue  { background: #0c1e3d; color: #60a5fa; border: 1px solid #1d4ed8; }
+.pill-gray  { background: #1e293b; color: #94a3b8; border: 1px solid #334155; }
+
+.mono { font-family: monospace; font-size: 11px; color: #94a3b8; }
+.green { color: #4ade80; }
+.amber { color: #fbbf24; }
+.red   { color: #f87171; }
+.blue  { color: #60a5fa; }
+
+.divider { display: flex; align-items: center; gap: 10px; margin: 20px 0 12px; font-size: 11px; color: #475569; text-transform: uppercase; letter-spacing: .08em; }
+.divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: #334155; }
+
+.tip { background: #1e3a5f; border-left: 3px solid #60a5fa; padding: 10px 14px; font-size: 12px; color: #93c5fd; margin-bottom: 16px; line-height: 1.6; border-radius: 0 8px 8px 0; }
+.code-block { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px 14px; font-family: monospace; font-size: 12px; color: #4ade80; line-height: 1.8; margin-top: 10px; }
+
+.footer { text-align: center; font-size: 11px; color: #334155; padding-top: 12px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <div class="topbar-title">Data Masking & Access Control</div>
+    <div class="topbar-sub">PII detection &nbsp;·&nbsp; Restricted views &nbsp;·&nbsp; Task 5.2</div>
+  </div>
+  <a href="/" class="nav-btn">Back to Dashboard</a>
+</div>
+
+<!-- Metrics -->
+<div class="metrics">
+  <div class="mcard">
+    <div class="mcard-label">Total tables</div>
+    <div class="mcard-val blue">{{ tables|length }}</div>
+    <div class="mcard-sub">In public schema</div>
+  </div>
+  <div class="mcard">
+    <div class="mcard-label">PII columns found</div>
+    <div class="mcard-val {% if pii_columns|length > 0 %}red{% else %}green{% endif %}">
+      {{ pii_columns|length }}
+    </div>
+    <div class="mcard-sub">Need masking</div>
+  </div>
+  <div class="mcard">
+    <div class="mcard-label">Restricted views</div>
+    <div class="mcard-val green">{{ views|length }}</div>
+    <div class="mcard-sub">Masking views created</div>
+  </div>
+  <div class="mcard">
+    <div class="mcard-label">Privilege entries</div>
+    <div class="mcard-val amber">{{ privileges|length }}</div>
+    <div class="mcard-sub">Role table grants</div>
+  </div>
+</div>
+
+<!-- PII columns -->
+<div class="divider">PII columns detected</div>
+<div class="card">
+  <div class="card-title">
+    Sensitive columns that need masking
+    <span>Detected by column name pattern</span>
+  </div>
+  <div class="tip">
+    These columns likely contain sensitive data like emails, passwords, phone numbers. You should create masked views so restricted users cannot see real values.
+  </div>
+  <table>
+    <thead>
+      <tr><th>#</th><th>Table</th><th>Column</th><th>Data type</th><th>Risk</th><th>Masking SQL</th></tr>
+    </thead>
+    <tbody>
+      {% for p in pii_columns %}
+      <tr>
+        <td style="color:#64748b;">{{ loop.index }}</td>
+        <td>{{ p[0] }}</td>
+        <td class="mono" style="color:#f87171;">{{ p[1] }}</td>
+        <td style="color:#94a3b8;">{{ p[2] }}</td>
+        <td>
+          {% if 'password' in p[1]|lower or 'ssn' in p[1]|lower or 'credit' in p[1]|lower %}
+            <span class="pill pill-red">Critical</span>
+          {% elif 'email' in p[1]|lower or 'phone' in p[1]|lower or 'salary' in p[1]|lower %}
+            <span class="pill pill-amber">High</span>
+          {% else %}
+            <span class="pill pill-blue">Medium</span>
+          {% endif %}
+        </td>
+        <td class="mono" style="color:#60a5fa;">
+          {% if 'email' in p[1]|lower %}
+            left({{ p[1] }}, 3) || '***@***.com'
+          {% elif 'phone' in p[1]|lower %}
+            '***-***-' || right({{ p[1] }}::text, 4)
+          {% elif 'password' in p[1]|lower %}
+            '********'
+          {% elif 'name' in p[1]|lower %}
+            left({{ p[1] }}, 1) || '***'
+          {% else %}
+            '***MASKED***'
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="6" style="text-align:center; padding:20px; color:#4ade80;">
+          No PII columns detected — database appears clean
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- How to create masked views -->
+<div class="divider">How to create masked views</div>
+<div class="card">
+  <div class="card-title">
+    Masking examples
+    <span>Run these in psql to protect sensitive data</span>
+  </div>
+  <div class="tip">
+    A masked view shows fake/hidden values to restricted users while the real data stays safe in the original table. Create a view, then give readonly roles access to the view only — not the table.
+  </div>
+  <div class="code-block">
+-- Example: Create masked view for users table
+CREATE OR REPLACE VIEW users_masked AS
+SELECT
+    id,
+    left(email, 3) || '***@***.com'  AS email,
+    left(full_name, 1) || '***'       AS full_name,
+    '***-***-' || right(phone, 4)     AS phone,
+    '********'                         AS password,
+    created_at
+FROM users;
+
+-- Give readonly role access to view only
+GRANT SELECT ON users_masked TO readonly;
+
+-- Revoke direct table access
+REVOKE SELECT ON users FROM readonly;
+  </div>
+</div>
+
+<!-- Existing views -->
+<div class="divider">Existing views in database</div>
+<div class="card">
+  <div class="card-title">
+    Current views
+    <span>information_schema.views</span>
+  </div>
+  <table>
+    <thead>
+      <tr><th>#</th><th>View name</th><th>Definition preview</th></tr>
+    </thead>
+    <tbody>
+      {% for v in views %}
+      <tr>
+        <td style="color:#64748b;">{{ loop.index }}</td>
+        <td class="mono" style="color:#60a5fa;">{{ v[0] }}</td>
+        <td class="mono">{{ v[1][:80] if v[1] else '' }}...</td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="3" style="text-align:center; padding:20px; color:#64748b;">
+          No views found — create masked views using the SQL above
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Role privileges -->
+<div class="divider">Role privileges on tables</div>
+<div class="card">
+  <div class="card-title">
+    Access control matrix
+    <span>information_schema.role_table_grants</span>
+  </div>
+  <div class="tip">
+    Least privilege rule — every role should only have access to what it needs. Readonly roles should only have SELECT. No role except admin should have DELETE or TRUNCATE.
+  </div>
+  <table>
+    <thead>
+      <tr><th>Role</th><th>Table</th><th>Privilege</th><th>Risk</th></tr>
+    </thead>
+    <tbody>
+      {% for pr in privileges %}
+      <tr>
+        <td class="mono">{{ pr[0] }}</td>
+        <td>{{ pr[1] }}</td>
+        <td>
+          {% if pr[2] == 'SELECT' %}
+            <span class="pill pill-green">{{ pr[2] }}</span>
+          {% elif pr[2] in ['INSERT', 'UPDATE'] %}
+            <span class="pill pill-amber">{{ pr[2] }}</span>
+          {% elif pr[2] in ['DELETE', 'TRUNCATE'] %}
+            <span class="pill pill-red">{{ pr[2] }}</span>
+          {% else %}
+            <span class="pill pill-blue">{{ pr[2] }}</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if pr[2] in ['DELETE', 'TRUNCATE'] %}
+            <span class="pill pill-red">High — review needed</span>
+          {% elif pr[2] in ['INSERT', 'UPDATE'] %}
+            <span class="pill pill-amber">Medium</span>
+          {% else %}
+            <span class="pill pill-green">Low</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="4" style="text-align:center; padding:20px; color:#64748b;">
+          No explicit privileges found
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="footer">
+  Phase 5 — Task 5.2 &nbsp;·&nbsp; Data Masking · Access Control · Least Privilege
+</div>
+
+</body>
+</html>
